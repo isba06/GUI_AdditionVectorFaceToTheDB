@@ -3,3 +3,4 @@ data/CASIA-WebFace
 data/lfw_funneled
 *.tar
 neural_readme.md
+.idea/
