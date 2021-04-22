@@ -203,7 +203,7 @@ class ExampleApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
-    window = ExampleApp()  # Создаём объект класса ExampleApp
-    window.show()  # Показываем окно
-    app.exec_()  # запускаем приложение
+    window = ExampleApp()  
+    window.show()  
+    app.exec_() 
 
