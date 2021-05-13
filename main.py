@@ -1,5 +1,7 @@
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtCore import QTimer
 import sys
 from mysql.connector import connect, Error
 
@@ -51,7 +53,6 @@ def FaceToVector(image):
 
 
 
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -60,10 +61,10 @@ class Ui_MainWindow(object):
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
 
         self.LayoutAdd = QtWidgets.QGridLayout()
-        self.gridLayout.addLayout(self.LayoutAdd, 2, 0, 1, 1)
+        self.gridLayout.addLayout(self.LayoutAdd, 8, 0, 1, 1)
 
         self.DB_Layout = QtWidgets.QFormLayout()
-        self.gridLayout.addLayout(self.DB_Layout, 0, 0, 1, 2)
+        self.gridLayout.addLayout(self.DB_Layout, 1, 0, 1, 2)
 
         self.labelHost = QtWidgets.QLabel(self.centralwidget)
         self.DB_Layout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.labelHost)
@@ -92,12 +93,24 @@ class Ui_MainWindow(object):
         self.DB_Layout.setWidget(3, QtWidgets.QFormLayout.FieldRole, self.lineDB)
 
         self.ndicatorDB = QtWidgets.QLabel(self.centralwidget)
-        self.gridLayout.addWidget(self.ndicatorDB, 1, 0, 1, 1)
+        self.gridLayout.addWidget(self.ndicatorDB, 0, 0, 1, 1)
 
         self.ConnectButton = QtWidgets.QPushButton(self.centralwidget)
-        self.ConnectButton.setObjectName("ConnectButton")
         self.ConnectButton.clicked.connect(self.connect_database)
-        self.gridLayout.addWidget(self.ConnectButton, 0, 2, 1, 1)
+        self.gridLayout.addWidget(self.ConnectButton, 1, 2, 1, 1)
+
+        self.StartButton = QtWidgets.QPushButton(self.centralwidget)
+        self.gridLayout.addWidget(self.StartButton, 3, 2, 1, 1)
+        self.StartButton.clicked.connect(self.controlTimer)
+
+
+        self.ShotSaveButton = QtWidgets.QPushButton(self.centralwidget)
+        self.gridLayout.addWidget(self.ShotSaveButton, 4, 2, 1, 1)
+        self.ShotSaveButton.setEnabled(False)
+        self.ShotSaveButton.clicked.connect(self.shotAndSave)
+
+        self.image_label = QtWidgets.QLabel(self.centralwidget)
+        self.gridLayout.addWidget(self.image_label, 3, 0, 3, 1)
 
         #image and name selction layout
 
@@ -116,17 +129,18 @@ class Ui_MainWindow(object):
         self.LayoutAdd.addWidget(self.labelFace, 0, 0, 1, 1)
 
         self.AddButton = QtWidgets.QPushButton(self.centralwidget)
-        self.gridLayout.addWidget(self.AddButton, 3, 0, 1, 1)
+        self.gridLayout.addWidget(self.AddButton, 9, 0, 1, 1)
         self.AddButton.setEnabled(False)
         self.AddButton.clicked.connect(self.addFaceInDB)
 
         self.Add_label = QtWidgets.QLabel(self.centralwidget)
-        self.gridLayout.addWidget(self.Add_label, 2, 2, 1, 1 )
+        self.gridLayout.addWidget(self.Add_label, 10, 0, 1, 1 )
 
         self.toolButton = QtWidgets.QToolButton(self.centralwidget)
         self.LayoutAdd.addWidget(self.toolButton, 0, 2, 2, 1)
         self.toolButton.setEnabled(False)
         self.toolButton.clicked.connect(self.openFileFace)
+
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
@@ -149,6 +163,43 @@ class Ui_MainWindow(object):
         self.labelDB.setText(_translate("MainWindow", "database"))
         self.ConnectButton.setText(_translate("MainWindow", "Connect"))
         self.AddButton.setText(_translate("MainWindow", "Add"))
+        self.StartButton.setText(_translate("MainWindow", "Start Camera"))
+        self.ShotSaveButton.setText(_translate("MainWindow", "Shot and save"))
+        self.image_label.setText(_translate("MainWindow", "Shot and save"))
+
+
+    def openCamera(self):
+        face_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+        ret, frame = self.cap.read()
+        ret1, self.frame1 = self.cap.read()
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        for (x, y, w, h) in faces:
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 100), 3)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        height, width, channel = frame.shape
+        step = channel * width
+        qImg = QImage(frame.data, width, height, step, QImage.Format_RGB888)
+        self.image_label.setPixmap(QPixmap.fromImage(qImg))
+
+    def controlTimer(self):
+        self.ShotSaveButton.setEnabled(True)
+        if not self.timer.isActive():
+            self.cap = cv2.VideoCapture(0)
+            self.timer.start(20)
+            self.StartButton.setText("Stop Camera")
+        else:
+            self.timer.stop()
+            self.cap.release()
+            self.image_label.setText("")
+            self.StartButton.setText("Start Camera")
+
+    def shotAndSave(self):
+        filename = ('snapshot_' + str(time.strftime("%Y-%b-%d_%H%M%S%p")) + '.jpg').format(0)
+        cv2.imwrite(filename, self.frame1)
+        print('Image saved as:', filename)
+        self.lineFace.setText(filename)
+
 
     def getFace(self):
         return self.lineFace.text()
@@ -199,11 +250,13 @@ class ExampleApp(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.openCamera)
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
-    window = ExampleApp()  
-    window.show()  
-    app.exec_() 
+    window = ExampleApp()
+    window.show()
+    app.exec_()
+
 
